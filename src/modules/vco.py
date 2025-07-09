@@ -1,316 +1,195 @@
 import random
-from pyo import Sine, LFO, Noise
+from typing import Dict, List, Tuple
+from pyo import Sine, LFO, Noise, Sig, PyoObject
 from .base_module import BaseModule
 
 
 class VCO(BaseModule):
     """
     VCO (Voltage Controlled Oscillator)
-    電圧制御オシレーター - 音の基本波形を生成
+    電圧制御オシレーター - 音の基本波形を生成します。
+    周波数、波形、振幅をパラメータやCV入力で制御できます。
     """
 
-    # 利用可能な波形タイプ
-    WAVEFORMS = {"sine": "sine", "saw": "saw", "square": "square", "triangle": "triangle", "noise": "noise"}
+    # --- 定数の定義 ---
+    WAVEFORMS: List[str] = ["sine", "saw", "square", "triangle", "noise"]
+
+    # パラメータのデフォルト範囲
+    OCTAVE_RANGE: Tuple[int, int] = (-2, 2)
+    FINE_TUNE_RANGE: Tuple[float, float] = (-100.0, 100.0)  # in cents
+    AMPLITUDE_RANGE: Tuple[float, float] = (0.0, 1.0)
+    FREQ_RANGE: Tuple[float, float] = (20.0, 20000.0)
 
     def __init__(self, name: str = "VCO", base_freq: float = 440.0, waveform: str = "sine"):
         super().__init__(name)
 
-        # 基本パラメータ
+        # --- パラメータの初期化 ---
         self.set_parameter("base_freq", base_freq)
-        self.set_parameter("waveform", waveform)
+        self.set_parameter("waveform", waveform if waveform in self.WAVEFORMS else "sine")
         self.set_parameter("amplitude", 0.5)
-        self.set_parameter("octave", 0)  # オクターブ調整 (-2 ~ +2)
-        self.set_parameter("fine_tune", 0)  # ファインチューニング (-100 ~ +100 cents)
+        self.set_parameter("octave", 0)
+        self.set_parameter("fine_tune", 0.0)
+        self.set_parameter("fm_depth", 100.0)
 
-        # 入力端子を定義
-        self.add_input("freq_cv", 0)  # 周波数制御電圧
-        self.add_input("fm_input", 0)  # FM変調入力
-        self.add_input("pwm_input", 0)  # PWM入力（square波用）
-        self.add_input("sync_input", 0)  # 同期入力
-        self.add_input("reset_input", 0)  # リセット入力
+        # --- 入出力ポートの定義 ---
+        self.add_input("freq_cv", 0)
+        self.add_input("fm_input", 0)
+        self.add_input("pwm_input", 0)
+        self.add_input("sync_input", 0)
+        self.add_input("reset_input", 0)
 
-        # 出力端子を定義
-        self.add_output("audio_out")  # メイン音声出力
-        self.add_output("sync_out")  # 同期出力
+        self.add_output("audio_out")
+        self.add_output("sync_out")
 
-        # pyoオブジェクト
-        self.oscillator = None
-        self.freq_signal = None
-        self.current_freq = base_freq
+        # --- pyoオブジェクトと内部状態の初期化 ---
+        self.current_freq: float = base_freq
+        self.last_waveform: str = self.get_parameter("waveform")
 
-        # 波形生成オブジェクト
-        self.sine_osc = None
-        self.saw_osc = None
-        self.square_osc = None
-        self.triangle_osc = None
-        self.noise_gen = None
-
-        # 内部状態
-        self.last_waveform = waveform
-        self.phase = 0.0
+        self.amp_signal: Sig | None = None
+        self.oscillator: PyoObject | None = None
+        self.oscillators: Dict[str, PyoObject] = {}
 
     def _initialize(self):
         """
-        初期化処理 - pyoオブジェクトを作成
+        初期化処理 - pyoオブジェクトを作成し、参照を保持します。
         """
-        # 基本周波数の計算
-        self._update_frequency()
-
-        # 波形オシレーターを作成
+        self.amp_signal = Sig(self.get_parameter("amplitude"))
         self._create_oscillators()
-
-        # 初期波形を設定
         self._set_waveform(self.get_parameter("waveform"))
 
-        # 出力を設定
-        self.outputs["audio_out"] = self.oscillator
-        self.outputs["sync_out"] = self.oscillator  # 同期出力も同じ信号
+        # ガベージコレクションを防ぐために参照を保持
+        self.pyo_objects = [self.amp_signal] + list(self.oscillators.values())
 
     def _create_oscillators(self):
         """
-        各波形のオシレーターを作成
+        利用可能なすべての波形のpyoオブジェクトを生成し、辞書に格納します。
         """
-        freq = self.current_freq
-        amp = self.get_parameter("amplitude")
+        freq = self.get_parameter("base_freq")
+        amp = self.amp_signal
 
-        # 各波形のオシレーターを作成
-        self.sine_osc = Sine(freq=freq, mul=amp)
-        self.saw_osc = LFO(freq=freq, sharp=1.0, type=0, mul=amp)  # Saw up
-        self.square_osc = LFO(freq=freq, sharp=0.5, type=2, mul=amp)  # Square
-        self.triangle_osc = LFO(freq=freq, sharp=0.5, type=3, mul=amp)  # Triangle
-        self.noise_gen = Noise(mul=amp * 0.1)  # ノイズは音量を下げる
-
-        # pyoオブジェクトリストに追加
-        self.pyo_objects = [self.sine_osc, self.saw_osc, self.square_osc, self.triangle_osc, self.noise_gen]
+        self.oscillators = {
+            "sine": Sine(freq=freq, mul=amp),
+            "saw": LFO(freq=freq, sharp=1.0, type=0, mul=amp),
+            "square": LFO(freq=freq, sharp=0.5, type=2, mul=amp),
+            "triangle": LFO(freq=freq, sharp=0.5, type=3, mul=amp),
+            "noise": Noise(mul=amp * 0.1),  # ノイズは他より音量が大きいため調整
+        }
 
     def _set_waveform(self, waveform: str):
         """
-        波形を設定
-
-        Args:
-            waveform: 波形の種類
+        出力する波形を、生成済みのオシレーターから選択します。
         """
-        if waveform not in self.WAVEFORMS:
-            print(f"Warning: Unknown waveform '{waveform}', using 'sine'")
-            waveform = "sine"
-
-        # 現在のオシレーターを設定
-        if waveform == "sine":
-            self.oscillator = self.sine_osc
-        elif waveform == "saw":
-            self.oscillator = self.saw_osc
-        elif waveform == "square":
-            self.oscillator = self.square_osc
-        elif waveform == "triangle":
-            self.oscillator = self.triangle_osc
-        elif waveform == "noise":
-            self.oscillator = self.noise_gen
-
-        # 出力を更新
+        self.oscillator = self.oscillators.get(waveform, self.oscillators["sine"])
         self.outputs["audio_out"] = self.oscillator
-        self.outputs["sync_out"] = self.oscillator
-
+        self.outputs["sync_out"] = self.oscillator  # 同期出力も同じ信号
         self.last_waveform = waveform
 
     def _update_frequency(self):
         """
-        周波数を計算・更新
+        各種パラメータと入力値から、最終的な周波数を計算し、全オシレーターに適用します。
         """
+        # パラメータを取得
         base_freq = self.get_parameter("base_freq")
         octave = self.get_parameter("octave")
         fine_tune = self.get_parameter("fine_tune")
+        fm_depth = self.get_parameter("fm_depth")
 
-        # オクターブ調整
-        freq_with_octave = base_freq * (2**octave)
+        # オクターブとファインチューンを適用
+        freq = base_freq * (2**octave) * (2 ** (fine_tune / 1200.0))
 
-        # ファインチューニング（セント単位）
-        freq_with_fine = freq_with_octave * (2 ** (fine_tune / 1200.0))
-
-        # CV入力の処理（1V/Oct標準）
+        # CV入力 (1V/Oct) を適用
         freq_cv = self.get_input_value("freq_cv", 0)
         if isinstance(freq_cv, (int, float)):
-            freq_with_cv = freq_with_fine * (2**freq_cv)
-        else:
-            freq_with_cv = freq_with_fine
+            freq *= 2**freq_cv
 
-        # FM入力の処理
+        # FM入力を適用
         fm_input = self.get_input_value("fm_input", 0)
         if isinstance(fm_input, (int, float)):
-            freq_with_fm = freq_with_cv + (fm_input * 100)  # FM深度
-        else:
-            freq_with_fm = freq_with_cv
+            freq += fm_input * fm_depth
 
-        # 周波数の範囲制限
-        self.current_freq = max(20, min(20000, freq_with_fm))
-
-        # 全オシレーターの周波数を更新
-        if self.is_active:
-            self._update_all_oscillators()
-
-    def _update_all_oscillators(self):
-        """
-        すべてのオシレーターの周波数を更新
-        """
-        freq = self.current_freq
-
-        if self.sine_osc:
-            self.sine_osc.setFreq(freq)
-        if self.saw_osc:
-            self.saw_osc.setFreq(freq)
-        if self.square_osc:
-            self.square_osc.setFreq(freq)
-        if self.triangle_osc:
-            self.triangle_osc.setFreq(freq)
+        # 周波数をクリッピングして適用
+        self.current_freq = self._clip_value(freq, *self.FREQ_RANGE)
+        for osc in self.oscillators.values():
+            if hasattr(osc, "setFreq"):
+                osc.setFreq(self.current_freq)
 
     def _update_amplitude(self):
         """
-        振幅を更新
+        振幅パラメータの変更をamp_signalに反映します。
         """
-        amp = self.get_parameter("amplitude")
-
-        if self.sine_osc:
-            self.sine_osc.setMul(amp)
-        if self.saw_osc:
-            self.saw_osc.setMul(amp)
-        if self.square_osc:
-            self.square_osc.setMul(amp)
-        if self.triangle_osc:
-            self.triangle_osc.setMul(amp)
-        if self.noise_gen:
-            self.noise_gen.setMul(amp * 0.1)
+        if self.amp_signal:
+            self.amp_signal.setValue(self.get_parameter("amplitude"))
 
     def process(self):
         """
-        メイン処理 - 毎フレーム呼び出される
+        モジュールのメイン処理。毎フレーム呼び出されることを想定しています。
         """
-        # 周波数の更新
         self._update_frequency()
+        self._update_amplitude()
 
-        # 波形の変更チェック
+        # 波形の変更をチェック
         current_waveform = self.get_parameter("waveform")
         if current_waveform != self.last_waveform:
             self._set_waveform(current_waveform)
 
-        # 振幅の更新
-        self._update_amplitude()
-
-        # 同期入力の処理
+        # 同期/リセット入力の処理
         sync_input = self.get_input_value("sync_input", 0)
         if sync_input and hasattr(self.oscillator, "reset"):
             self.oscillator.reset()
 
-        # リセット入力の処理
         reset_input = self.get_input_value("reset_input", 0)
         if reset_input and hasattr(self.oscillator, "reset"):
             self.oscillator.reset()
 
-    def set_frequency(self, freq: float):
-        """
-        基本周波数を設定
+    # --- パラメータ設定用メソッド ---
 
-        Args:
-            freq: 周波数（Hz）
-        """
+    def set_frequency(self, freq: float):
         self.set_parameter("base_freq", freq)
         self._update_frequency()
 
     def set_waveform(self, waveform: str):
-        """
-        波形を設定
-
-        Args:
-            waveform: 波形の種類
-        """
         if waveform in self.WAVEFORMS:
             self.set_parameter("waveform", waveform)
-            if self.is_active:
-                self._set_waveform(waveform)
+        else:
+            print(f"Warning: Unknown waveform '{waveform}', using 'sine'")
+            self.set_parameter("waveform", "sine")
 
     def set_octave(self, octave: int):
-        """
-        オクターブを設定
-
-        Args:
-            octave: オクターブ（-2 ~ +2）
-        """
-        octave = max(-2, min(2, octave))
+        octave = int(self._clip_value(octave, *self.OCTAVE_RANGE))
         self.set_parameter("octave", octave)
         self._update_frequency()
 
     def set_fine_tune(self, cents: float):
-        """
-        ファインチューニングを設定
-
-        Args:
-            cents: セント単位の調整値（-100 ~ +100）
-        """
-        cents = max(-100, min(100, cents))
+        cents = self._clip_value(cents, *self.FINE_TUNE_RANGE)
         self.set_parameter("fine_tune", cents)
         self._update_frequency()
 
     def set_amplitude(self, amp: float):
-        """
-        振幅を設定
-
-        Args:
-            amp: 振幅（0.0 ~ 1.0）
-        """
-        amp = max(0.0, min(1.0, amp))
+        amp = self._clip_value(amp, *self.AMPLITUDE_RANGE)
         self.set_parameter("amplitude", amp)
         self._update_amplitude()
 
+    # --- ユーティリティメソッド ---
+
+    def _clip_value(self, value: float, min_val: float, max_val: float) -> float:
+        """指定された範囲内に値をクリップします。"""
+        return max(min_val, min(max_val, value))
+
     def randomize_parameters(self):
-        """
-        パラメータをランダムに設定
-        """
-        # ランダムな周波数（A1～A6）
-        random_freq = 55 * (2 ** random.randint(0, 5))
-        self.set_frequency(random_freq)
+        """モジュールのパラメータをランダムな値に設定します。"""
+        self.set_frequency(55 * (2 ** random.randint(0, 5)))  # A1-A6
+        self.set_waveform(random.choice(self.WAVEFORMS))
+        self.set_octave(random.randint(-1, 1))
+        self.set_fine_tune(random.uniform(-50, 50))
+        self.set_amplitude(random.uniform(0.3, 0.8))
+        print(f"{self.name} parameters randomized.")
 
-        # ランダムな波形
-        random_waveform = random.choice(list(self.WAVEFORMS.keys()))
-        self.set_waveform(random_waveform)
-
-        # ランダムなオクターブ
-        random_octave = random.randint(-1, 1)
-        self.set_octave(random_octave)
-
-        # ランダムなファインチューニング
-        random_fine = random.uniform(-50, 50)
-        self.set_fine_tune(random_fine)
-
-        # ランダムな振幅
-        random_amp = random.uniform(0.3, 0.8)
-        self.set_amplitude(random_amp)
-
-        print(
-            f"{self.name}: Randomized to {random_freq}Hz, {random_waveform}, oct:{random_octave}, fine:{random_fine:.1f}, amp:{random_amp:.2f}"
-        )
-
-    def get_current_frequency(self) -> float:
-        """
-        現在の周波数を取得
-
-        Returns:
-            現在の周波数（Hz）
-        """
-        return self.current_freq
-
-    def get_available_waveforms(self) -> list:
-        """
-        利用可能な波形のリストを取得
-
-        Returns:
-            波形名のリスト
-        """
-        return list(self.WAVEFORMS.keys())
+    def get_available_waveforms(self) -> List[str]:
+        """利用可能な波形のリストを返します。"""
+        return self.WAVEFORMS
 
     def _cleanup(self):
-        """
-        終了処理
-        """
+        """モジュール停止時のクリーンアップ処理。"""
         super()._cleanup()
-
-        # 追加の終了処理があればここに記述
         self.oscillator = None
-        self.freq_signal = None
+        self.oscillators.clear()
