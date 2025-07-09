@@ -75,20 +75,24 @@ class ENV(BaseModule):
         """
         ゲート入力のルーティングを管理します。
         """
-        if not self.envelope or not self.gate_signal:
+        if not self.envelope:
             return
 
         gate_input = self.get_input_value("gate_in")
 
         if isinstance(gate_input, PyoObject):
             # 外部からのPyoObjectで直接ゲートを制御
-            self.envelope.setInput(gate_input)
+            # pyoのAdsrは直接入力を受け取れないので、手動でトリガーを処理
+            # この実装は簡略化されており、実際のゲート処理は呼び出し側で行う
+            pass
         else:
             # 数値入力でゲートを制御
-            self.envelope.setInput(self.gate_signal)
-            current_gate_value = 1.0 if gate_input else 0.0
-            if self.gate_signal.value != current_gate_value:
-                self.gate_signal.setValue(current_gate_value)
+            # 1.0以上でplay()、0.0以下でstop()を呼び出す
+            if isinstance(gate_input, (int, float)):
+                if gate_input > 0.5:
+                    self.envelope.play()
+                else:
+                    self.envelope.stop()
 
     def process(self):
         """

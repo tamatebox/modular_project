@@ -90,13 +90,23 @@ class VCA(BaseModule):
 
         # --- CV入力の処理 ---
         gain_cv = self.get_input_value("gain_cv", 0)
-        cv_contribution = gain_cv * cv_amount if isinstance(gain_cv, (int, float)) else 0
+        if isinstance(gain_cv, (int, float)):
+            cv_contribution = gain_cv * cv_amount
+        elif isinstance(gain_cv, PyoObject):
+            # PyoObjectの場合は、cv_amountを乗算したオブジェクトを作成
+            cv_contribution = gain_cv * cv_amount
+        else:
+            cv_contribution = 0
 
         am_input = self.get_input_value("am_input", 0)
         am_contribution = am_input if isinstance(am_input, (int, float)) else 0
 
         # --- ゲインの基本計算 ---
-        calculated_gain = base_gain + cv_contribution + offset + am_contribution
+        if isinstance(cv_contribution, PyoObject):
+            # PyoObjectの場合は、base_gainとoffsetを加算したオブジェクトを作成
+            calculated_gain = cv_contribution + (base_gain + offset + am_contribution)
+        else:
+            calculated_gain = base_gain + cv_contribution + offset + am_contribution
 
         # --- ベロシティとゲートの適用 ---
         velocity_cv = self.get_input_value("velocity_cv", 1.0)
@@ -130,9 +140,7 @@ class VCA(BaseModule):
         """
         # ゲイン値を計算し、pyoオブジェクトに反映
         current_gain = self._calculate_gain()
-        if self.gain_signal:
-            self.gain_signal.setValue(current_gain)
-
+        
         # オーディオ入力の接続状態を確認
         audio_input = self.get_input_value("audio_in")
         is_valid_input = isinstance(audio_input, PyoObject)
@@ -141,8 +149,17 @@ class VCA(BaseModule):
             # 新しい入力が接続された場合、接続を更新
             if self.current_audio_input != audio_input:
                 self.current_audio_input = audio_input
-                self.current_audio_input.setMul(self.gain_smoother)
                 self.outputs["audio_out"] = self.current_audio_input
+            
+            # ゲイン制御を適用
+            if isinstance(current_gain, PyoObject):
+                # PyoObjectの場合は直接setMulで制御
+                self.current_audio_input.setMul(current_gain)
+            else:
+                # 数値の場合はgain_smootherを経由
+                if self.gain_signal:
+                    self.gain_signal.setValue(current_gain)
+                self.current_audio_input.setMul(self.gain_smoother)
         else:
             # 入力が切断された場合、出力を無音に設定
             if self.current_audio_input is not None:
