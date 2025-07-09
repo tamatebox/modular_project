@@ -1,10 +1,13 @@
 import time
 import sys
 import os
+import logging
 from typing import Dict, List, Any
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 from src.connection import ConnectionManager
+
+logger = logging.getLogger(__name__)
 
 
 class BaseModule:
@@ -68,7 +71,7 @@ class BaseModule:
 
         # 接続を設定
         self.inputs[input_name] = source_module.outputs[output_name]
-        print(f"Connected {source_module.name}.{output_name} to {self.name}.{input_name}")
+        logger.info(f"Connected {source_module.name}.{output_name} to {self.name}.{input_name}")
 
     def disconnect(self, input_name: str):
         """
@@ -79,7 +82,7 @@ class BaseModule:
         """
         if input_name in self.inputs:
             self.inputs[input_name] = None
-            print(f"Disconnected {self.name}.{input_name}")
+            logger.info(f"Disconnected {self.name}.{input_name}")
 
     def get_input_value(self, input_name: str, default_value: Any = 0):
         """
@@ -110,7 +113,7 @@ class BaseModule:
             value: 設定値
         """
         self.parameters[param_name] = value
-        print(f"Set {self.name}.{param_name} = {value}")
+        logger.info(f"Set {self.name}.{param_name} = {value}")
 
     def get_parameter(self, param_name: str, default_value: Any = 0):
         """
@@ -132,7 +135,7 @@ class BaseModule:
         if not self.is_active:
             self.is_active = True
             self._initialize()
-            print(f"{self.name} started")
+            logger.info(f"{self.name} started")
 
     def stop(self):
         """
@@ -141,7 +144,7 @@ class BaseModule:
         if self.is_active:
             self.is_active = False
             self._cleanup()
-            print(f"{self.name} stopped")
+            logger.info(f"{self.name} stopped")
 
     def set_connection_manager(self, connection_manager: ConnectionManager):
         """接続マネージャーを設定"""

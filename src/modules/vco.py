@@ -1,7 +1,10 @@
 import random
+import logging
 from typing import Dict, List, Tuple
 from pyo import Sine, LFO, Noise, Sig, PyoObject
 from .base_module import BaseModule
+
+logger = logging.getLogger(__name__)
 
 
 class VCO(BaseModule):
@@ -151,7 +154,7 @@ class VCO(BaseModule):
         if waveform in self.WAVEFORMS:
             self.set_parameter("waveform", waveform)
         else:
-            print(f"Warning: Unknown waveform '{waveform}', using 'sine'")
+            logger.warning(f"Unknown waveform '{waveform}', using 'sine'")
             self.set_parameter("waveform", "sine")
 
     def set_octave(self, octave: int):
@@ -182,7 +185,7 @@ class VCO(BaseModule):
         self.set_octave(random.randint(-1, 1))
         self.set_fine_tune(random.uniform(-50, 50))
         self.set_amplitude(random.uniform(0.3, 0.8))
-        print(f"{self.name} parameters randomized.")
+        logger.info(f"{self.name} parameters randomized.")
 
     def get_available_waveforms(self) -> List[str]:
         """利用可能な波形のリストを返します。"""

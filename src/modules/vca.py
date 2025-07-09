@@ -1,8 +1,11 @@
 import random
 import math
-from typing import Any, Dict, List, Tuple
+import logging
+from typing import Dict, List, Tuple
 from pyo import Sig, Port, PyoObject
 from .base_module import BaseModule
+
+logger = logging.getLogger(__name__)
 
 
 class VCA(BaseModule):
@@ -170,7 +173,7 @@ class VCA(BaseModule):
         if curve in self.CONTROL_CURVES:
             self.set_parameter("control_curve", curve)
         else:
-            print(f"Warning: Unknown control curve '{curve}', using 'exponential'")
+            logger.warning(f"Unknown control curve '{curve}', using 'exponential'")
             self.set_parameter("control_curve", "exponential")
 
     def set_max_gain(self, max_gain: float):
@@ -195,7 +198,7 @@ class VCA(BaseModule):
         if self.outputs.get("audio_out"):
             self.outputs["audio_out"].out(chnl=channel)
         else:
-            print(f"Warning: {self.name} has no audio output to play.")
+            logger.warning(f"{self.name} has no audio output to play.")
 
     def stop_output(self):
         """音声出力を停止します。"""
@@ -209,7 +212,7 @@ class VCA(BaseModule):
         self.set_offset(random.uniform(*self.OFFSET_RANGE))
         self.set_control_curve(random.choice(list(self.CONTROL_CURVES.keys())))
         self.set_smoothing_time(random.uniform(0.005, 0.05))
-        print(f"{self.name} parameters randomized.")
+        logger.info(f"{self.name} parameters randomized.")
 
     def get_available_curves(self) -> List[str]:
         """利用可能な制御曲線のリストを返します。"""

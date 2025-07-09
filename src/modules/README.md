@@ -15,6 +15,25 @@
     - `stop()`: 音声処理を停止する。
     - `process()`: パラメータや入力の変更を`pyo`オブジェクトに反映させるためのメインループ。
 
+## ロギング
+
+各モジュールは、Pythonの標準`logging`モジュールを使用して、動作状況や警告を出力します。`print()`は使用されていません。
+
+これにより、アプリケーション全体でログの表示レベルやフォーマット、出力先（コンソール、ファイルなど）を柔軟に制御できます。
+
+モジュールからのログを有効にするには、アプリケーションのエントリーポイント（例: `main.py`）で以下のように基本的な設定を行う必要があります。
+
+```python
+import logging
+
+logging.basicConfig(
+    level=logging.INFO, # INFOレベル以上のログを表示
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+```
+- `level`: 表示するログの最低レベルを指定します (`DEBUG`, `INFO`, `WARNING`, `ERROR`)。
+- `format`: ログの出力形式を定義します。`%(name)s` には `src.modules.vco` のようにモジュール名が入ります。
+
 ## モジュール一覧
 
 - ### `base_module.py`
