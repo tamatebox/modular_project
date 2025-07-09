@@ -44,6 +44,21 @@ logging.basicConfig(
   - **主なパラメータ**: `base_freq`（基本周波数）、`waveform`（波形）、`amplitude`（振幅）。
   - **主な入出力**: `freq_cv`（周波数制御）、`audio_out`（音声出力）。
 
+- ### `vcf.py` (Voltage Controlled Filter)
+  - **役割**: 電圧制御フィルター。入力された音声信号の周波数成分を削ることで音色を変化させます。
+  - **主なパラメータ**: `freq`（カットオフ周波数）、`q`（レゾナンス）。
+  - **主な入出力**: `audio_in`（音声入力）、`freq_cv`（周波数制御）、`audio_out`（音声出力）。
+
+- ### `lfo.py` (Low Frequency Oscillator)
+  - **役割**: 低周波オシレーター。他のモジュールのパラメータ（VCOの周波数、VCFのカットオフなど）を周期的に変化させるための制御信号（CV）を生成します。
+  - **主なパラメータ**: `freq`（周波数）、`waveform`（波形）、`amplitude`（振幅）。
+  - **主な入出力**: `freq_cv`（周波数制御）、`cv_out`（制御信号出力）。
+
+- ### `env.py` (Envelope Generator)
+  - **役割**: エンベロープジェネレーター。ゲート信号をトリガーにして、時間的な変化の形状（ADSR）を持つ制御信号を生成します。主にVCAの音量制御に使用されます。
+  - **主なパラメータ**: `attack`, `decay`, `sustain`, `release`。
+  - **主な入出力**: `gate_in`（トリガー入力）、`cv_out`（制御信号出力）。
+
 - ### `vca.py` (Voltage Controlled Amplifier)
   - **役割**: 電圧制御アンプ。入力された音声信号の音量を制御します。
   - **主なパラメータ**: `gain`（基本ゲイン）。
