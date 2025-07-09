@@ -4,9 +4,10 @@ version = "0.1.0"
 description = "A sound installation that generates a modular synth-style audio composition with constrained randomness."
 requires-python = ">=3.11, <3.12"
 dependencies = [
-    "pyo",
+    "pyo==1.0.5",
     "numpy",
     "sounddevice",
+    "wxpython>=4.2.3",
 ]
 
 [tool.black]
