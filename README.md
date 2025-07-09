@@ -29,3 +29,18 @@ VCO（オシレーター）、VCF（フィルター）、LFOなどの仮想モ�
     ```bash
     python main.py
     ```
+
+## 📚 詳細ドキュメント
+
+プロジェクトの詳細な技術情報や開発記録は以下の場所に整理されています：
+
+### 🎛️ モジュールドキュメント
+- **[src/modules/README.md](src/modules/README.md)** - 実装されたシンセモジュール（VCO、VCF、VCA、LFO、ENV）の技術仕様と使用方法
+
+### 📖 技術ドキュメント
+- **[MODULAR_GUIDE.md](doc/MODULAR_GUIDE.md)** - モジュラーシンセサイザーの基本的な使い方とパッチング手法
+- **[MANUAL.md](doc/MANUAL.md)** - プロジェクトの制作手順書と環境構築ガイド
+- **[1.md](doc/1.md)** - プロジェクト全体の総括と実装したモジュール一覧
+- **[2.md](doc/2.md)** - VCO→VCA音響出力問題のデバッグ記録
+- **[3.md](doc/3.md)** - `new_modules_test.py`の音声出力問題解決記録
+- **[pyo.md](doc/pyo.md)** - Pyoライブラリを使用した音響処理の技術情報

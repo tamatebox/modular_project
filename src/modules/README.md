@@ -70,7 +70,7 @@ logging.basicConfig(
 
 ```python
 from pyo import Server
-from src.connection import ConnectionManager
+from src.connection import ConnectionManager, SignalType
 from src.modules.vco import VCO
 from src.modules.vca import VCA
 
@@ -89,7 +89,7 @@ vco.start()
 vca.start()
 
 # 4. モジュール間を接続
-cm.connect("my_osc", "audio_out", "my_amp", "audio_in")
+cm.connect("my_osc", "audio_out", "my_amp", "audio_in", SignalType.AUDIO)
 
 # 5. VCAのprocessを呼び出して接続を反映
 vca.process()
@@ -103,3 +103,47 @@ vca.out_to_channel(0)
 s.stop()
 s.shutdown()
 ```
+
+## 🚨 重要な作法
+
+### 1. モジュール接続後は必ず `process()` を呼ぶ
+
+```python
+# モジュールを接続した後は、受信側モジュールの process() を呼び出す
+cm.connect("vco", "audio_out", "vcf", "audio_in", SignalType.AUDIO)
+vcf.process()  # VCFに接続を反映
+
+cm.connect("vcf", "audio_out", "vca", "audio_in", SignalType.AUDIO)
+vca.process()  # VCAに接続を反映
+```
+
+### 2. パラメータ変更後は必ず `process()` を呼ぶ
+
+```python
+# パラメータを変更した後は、そのモジュールの process() を呼び出す
+vcf.set_frequency(1000)
+vcf.process()  # パラメータ変更を反映
+
+vca.set_gain(0.8)
+vca.process()  # パラメータ変更を反映
+```
+
+### 3. PyoObject CV制御への対応
+
+特にVCAモジュールでは、ENVモジュールのPyoObject出力を適切に処理できます：
+
+```python
+# ENVモジュールのADSRエンベロープでVCAを制御
+env = ENV(name="env1")
+env.set_attack(0.05)
+env.set_decay(0.3)
+env.set_sustain(0.4)
+env.set_release(1.5)
+env.process()  # ADSRパラメータを反映
+
+# ENVからVCAへのCV制御接続
+cm.connect("env1", "cv_out", "vca1", "gain_cv", SignalType.CV)
+vca.process()  # PyoObject CV制御を反映
+```
+
+詳細な使い方については、[`doc/MODULAR_GUIDE.md`](../../doc/MODULAR_GUIDE.md) を参照してください。
