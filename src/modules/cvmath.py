@@ -7,6 +7,7 @@ import sys
 import os
 import logging
 from typing import Dict, Any
+from pyo import Sig
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 from src.modules.base_module import BaseModule
@@ -39,10 +40,10 @@ class CVMath(BaseModule):
         """pyoオブジェクトの初期化"""
         # 演算結果を保存するための変数
         self.current_result = None
-        
+
         self.is_active = True
         logger.info(f"{self.name} started with operation: {self.parameters['operation']}")
-        
+
         # 初期出力を構築
         self._rebuild_output()
 
@@ -60,19 +61,19 @@ class CVMath(BaseModule):
         # 入力値を取得
         input_a = self.get_input_value("input_a")
         input_b = self.get_input_value("input_b")
-        
-        logger.info(f"{self.name} rebuilding output: input_a={input_a} (type: {type(input_a)}), input_b={input_b} (type: {type(input_b)})")
+
+        logger.info(
+            f"{self.name} rebuilding output: input_a={input_a} (type: {type(input_a)}), input_b={input_b} (type: {type(input_b)})"
+        )
 
         # 入力値をpyoオブジェクトに変換
-        from pyo import Sig
-        
-        if hasattr(input_a, 'out'):  # pyoオブジェクトの場合
+        if hasattr(input_a, "out"):  # pyoオブジェクトの場合
             sig_a = input_a
         else:  # 数値の場合
             sig_a = Sig(input_a)
             self.pyo_objects.append(sig_a)
-            
-        if hasattr(input_b, 'out'):  # pyoオブジェクトの場合
+
+        if hasattr(input_b, "out"):  # pyoオブジェクトの場合
             sig_b = input_b
         else:  # 数値の場合
             sig_b = Sig(input_b)
@@ -82,9 +83,9 @@ class CVMath(BaseModule):
         operation = self.parameters["operation"]
         scale = self.parameters["scale"]
         offset = self.parameters["offset"]
-        
+
         logger.info(f"{self.name} rebuilding with operation={operation}, scale={scale}, offset={offset}")
-        
+
         if operation == "add":
             result = sig_a + sig_b
         elif operation == "subtract":
@@ -102,7 +103,9 @@ class CVMath(BaseModule):
         self.pyo_objects.append(self.current_result)
         self.outputs["output"] = self.current_result
 
-        logger.info(f"{self.name} rebuilt output successfully: operation={operation}, result_object={type(self.current_result)}")
+        logger.info(
+            f"{self.name} rebuilt output successfully: operation={operation}, result_object={type(self.current_result)}"
+        )
 
     def process(self):
         """CV信号を演算"""

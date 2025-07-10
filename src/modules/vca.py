@@ -138,33 +138,54 @@ class VCA(BaseModule):
         オーディオ信号の流れを更新します。
         入力の接続状態を監視し、pyoオブジェクトの接続を管理します。
         """
+        logger.info(f"=== {self.name} _update_audio_processing() start ===")
+
         # ゲイン値を計算し、pyoオブジェクトに反映
         current_gain = self._calculate_gain()
-        
+        logger.info(f"{self.name} calculated gain: {current_gain} (type: {type(current_gain)})")
+
         # オーディオ入力の接続状態を確認
         audio_input = self.get_input_value("audio_in")
         is_valid_input = isinstance(audio_input, PyoObject)
+        logger.info(f"{self.name} audio_input: {audio_input} (type: {type(audio_input)}, valid: {is_valid_input})")
 
         if is_valid_input:
-            # 新しい入力が接続された場合、接続を更新
+            # 新しい入力が接続された場合、新しい出力オブジェクトを作成
             if self.current_audio_input != audio_input:
+                logger.info(f"{self.name} updating audio input connection")
                 self.current_audio_input = audio_input
-                self.outputs["audio_out"] = self.current_audio_input
-            
-            # ゲイン制御を適用
-            if isinstance(current_gain, PyoObject):
-                # PyoObjectの場合は直接setMulで制御
-                self.current_audio_input.setMul(current_gain)
+                
+                # 新しい出力オブジェクトを作成（入力オブジェクトを直接変更しない）
+                if isinstance(current_gain, PyoObject):
+                    logger.info(f"{self.name} creating new output with PyoObject gain")
+                    self.outputs["audio_out"] = Sig(self.current_audio_input, mul=current_gain)
+                else:
+                    logger.info(f"{self.name} creating new output with numeric gain via smoother")
+                    if self.gain_signal:
+                        self.gain_signal.setValue(current_gain)
+                    self.outputs["audio_out"] = Sig(self.current_audio_input, mul=self.gain_smoother)
             else:
-                # 数値の場合はgain_smootherを経由
-                if self.gain_signal:
-                    self.gain_signal.setValue(current_gain)
-                self.current_audio_input.setMul(self.gain_smoother)
+                # 同じ入力で、ゲインのみ更新
+                if isinstance(current_gain, PyoObject):
+                    logger.info(f"{self.name} updating existing output with PyoObject gain")
+                    self.outputs["audio_out"] = Sig(self.current_audio_input, mul=current_gain)
+                else:
+                    logger.info(f"{self.name} updating existing output with numeric gain via smoother")
+                    if self.gain_signal:
+                        self.gain_signal.setValue(current_gain)
+                    # 出力オブジェクトが既にgain_smootherを使用している場合は何もしない
+                    if not hasattr(self.outputs["audio_out"], '_mul') or self.outputs["audio_out"]._mul != self.gain_smoother:
+                        self.outputs["audio_out"] = Sig(self.current_audio_input, mul=self.gain_smoother)
         else:
             # 入力が切断された場合、出力を無音に設定
             if self.current_audio_input is not None:
+                logger.warning(f"{self.name} audio input disconnected, setting to silence")
                 self.current_audio_input = None
                 self.outputs["audio_out"] = self.initial_output
+            else:
+                logger.warning(f"{self.name} no audio input connected")
+
+        logger.info(f"=== {self.name} _update_audio_processing() end - output: {self.outputs['audio_out']} ===")
 
     def process(self):
         """
@@ -212,8 +233,11 @@ class VCA(BaseModule):
 
     def out_to_channel(self, channel: int):
         """指定されたチャンネルに音声を出力します。"""
+        logger.info(f"=== {self.name} out_to_channel({channel}) called ===")
         if self.outputs.get("audio_out"):
+            logger.info(f"{self.name} sending audio output to channel {channel}: {self.outputs['audio_out']}")
             self.outputs["audio_out"].out(chnl=channel)
+            logger.info(f"{self.name} audio output sent to channel {channel}")
         else:
             logger.warning(f"{self.name} has no audio output to play.")
 
