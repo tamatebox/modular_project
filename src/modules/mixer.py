@@ -48,16 +48,14 @@ class Mixer(BaseModule):
             self.input_sigs.append(sig)
             self.pyo_objects.append(sig)
 
-        # 初期の無音出力を設定
-        self.mixed_output = Sig(0)
-        self.outputs["output"] = self.mixed_output
-        self.pyo_objects.append(self.mixed_output)
+        # 固定出力オブジェクトを作成
+        self.create_fixed_output("output", 0)
 
         self.is_active = True
         logger.info(f"{self.name} started with {self.num_inputs} inputs")
 
     def process(self):
-        """入力信号を混合"""
+        """入力信号を混合（固定出力オブジェクト版）"""
         if not self.is_active:
             logger.warning(f"{self.name} process() called but module is not active")
             return
@@ -70,46 +68,26 @@ class Mixer(BaseModule):
             input_val = self.get_input_value(f"input{i}")
             level = self.parameters[f"level{i}"]
             
-            logger.info(f"{self.name} input{i}: type={type(input_val)}, value={input_val}, level={level}")
-            
-            if hasattr(input_val, "out") and input_val != 0 and level > 0:  # PyoObjectで接続され、レベルが0より大きい場合
-                # レベル調整して追加（ArithmeticDummyを回避）
+            if hasattr(input_val, "out") and input_val != 0 and level > 0:
+                # レベル調整して追加
                 scaled_input = Sig(input_val, mul=level)
                 active_inputs.append(scaled_input)
-                logger.info(f"{self.name} input{i} added to active_inputs (scaled by {level})")
-            else:
-                logger.info(f"{self.name} input{i} skipped - not valid PyoObject or level=0")
-
-        logger.info(f"{self.name} total active_inputs: {len(active_inputs)}")
+                logger.info(f"{self.name} input{i} added (scaled by {level})")
 
         if active_inputs:
-            # pyoのMixで混合
-            mixed = Mix(active_inputs, voices=1)
+            # 新しい混合結果を作成
+            new_mixed = Mix(active_inputs, voices=1)
             master_level = self.parameters["master_level"]
-            logger.info(f"{self.name} created Mix object with {len(active_inputs)} inputs, master_level={master_level}")
-
-            # 既存の出力を新しい混合結果に更新
-            if self.mixed_output:
-                # 古い出力を新しい混合結果に置き換え（Mixオブジェクトに直接mulを適用）
-                mixed.setMul(master_level)
-                new_output = mixed
-                self.outputs["output"] = new_output
-                # pyoオブジェクトリストを更新
-                if self.mixed_output in self.pyo_objects:
-                    self.pyo_objects.remove(self.mixed_output)
-                self.mixed_output = new_output
-                self.pyo_objects.append(self.mixed_output)
-                logger.info(f"{self.name} output updated with Mix object, setMul({master_level})")
+            
+            # 固定出力オブジェクトの内容を更新
+            self.update_fixed_output("output", new_mixed, master_level)
+            logger.info(f"{self.name} updated fixed output with {len(active_inputs)} inputs")
         else:
-            # 無音を出力
-            if self.mixed_output and self.mixed_output in self.pyo_objects:
-                self.pyo_objects.remove(self.mixed_output)
-            self.mixed_output = Sig(0)
-            self.outputs["output"] = self.mixed_output
-            self.pyo_objects.append(self.mixed_output)
-            logger.warning(f"{self.name} no active inputs - output set to silence")
+            # 無音を出力（既存オブジェクトを更新）
+            self.update_fixed_output("output", 0)
+            logger.info(f"{self.name} set to silence via fixed output")
 
-        logger.info(f"=== {self.name} process() end - output: {self.outputs['output']} ===")
+        logger.info(f"=== {self.name} process() end ===")
 
     def set_input_level(self, input_index: int, level: float):
         """入力レベルを設定"""

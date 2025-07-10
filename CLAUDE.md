@@ -104,7 +104,22 @@ logging.basicConfig(
 
 ## Important Development Practices
 
-### 1. Always Call process() After Changes
+### 1. Fixed Output Architecture (NEW)
+**Audio output objects are automatically maintained after process() calls**. No manual re-connection required.
+
+```python
+# After connecting modules
+cm.connect("vco", "audio_out", "vca", "audio_in", SignalType.AUDIO)
+vca.process()  # Apply the connection
+vca.out_to_channel(0)  # Set initial output
+
+# After changing parameters - output automatically maintained
+mixer.set_input_level(0, 0.5)
+mixer.process()  # Audio output continues seamlessly
+# NO NEED to call out_to_channel() again
+```
+
+### 2. Always Call process() After Changes
 ```python
 # After connecting modules
 cm.connect("vco", "audio_out", "vca", "audio_in", SignalType.AUDIO)
@@ -115,14 +130,14 @@ vcf.set_frequency(1000)
 vcf.process()  # REQUIRED: Apply the parameter change
 ```
 
-### 2. Process Modules in Signal Flow Order
+### 3. Process Modules in Signal Flow Order
 ```python
 # Correct order: input → output
 vcf.process()  # Process filter first
 vca.process()  # Process amplifier second
 ```
 
-### 3. VCA Supports Both CV Types
+### 4. VCA Supports Both CV Types
 ```python
 # Numeric CV control
 vca.set_gain(0.5)  # Direct numeric value
@@ -131,7 +146,7 @@ vca.set_gain(0.5)  # Direct numeric value
 cm.connect("env", "cv_out", "vca", "gain_cv", SignalType.CV)  # Direct PyoObject
 ```
 
-### 4. Proper Server Lifecycle
+### 5. Proper Server Lifecycle
 ```python
 try:
     s = Server(nchnls=2, buffersize=512, duplex=0).boot().start()

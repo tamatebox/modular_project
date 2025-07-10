@@ -409,6 +409,18 @@ def multiple_stereo_effect():
 
 ### Mixer（ミキシング）モジュール
 
+Mixerモジュールは複数のオーディオ信号を混合して一つの出力にします。**ただし、Mixerは`process()`時に新しい出力オブジェクトを動的に作成するため、特別な処理が必要です。**
+
+#### ⚠️ Mixerモジュール使用時の重要な注意点
+
+Mixerを経由する信号チェーンでは、以下の手順を必ず守ってください：
+
+1. 通常の`process()`を実行
+2. **`cm.update_all_connections()`で接続を再適用**
+3. 後続モジュールを再度`process()`
+
+これを行わないと、Mixerの新しい出力が後続モジュールに渡されず、音が出力されません。
+
 ```python
 def mixer_chord():
     """和音生成: 複数のVCOをミキシング"""
@@ -444,6 +456,10 @@ def mixer_chord():
         # 処理
         mixer.process()
         vca.process()
+        
+        # 🚨 重要：Mixerを経由する場合は接続を再適用する
+        cm.update_all_connections()
+        vca.process()  # 再度処理して最新の接続を反映
 
         # 音声出力
         vca.out_to_channel(0)
@@ -453,6 +469,49 @@ def mixer_chord():
         s.stop()
         s.shutdown()
 ```
+
+#### ✅ Mixerでのリアルタイムレベル変更
+
+**固定出力アーキテクチャにより音声出力が自動的に維持されます**。現実のハードウェアモジュラーシンセサイザーと同様の動作を実現しています。
+
+**固定出力アーキテクチャの特徴**:
+- モジュールの`process()`実行後も出力オブジェクトが維持される
+- パッチケーブル（音声出力）が物理的に維持される感覚
+- 手動での`out_to_channel()`再実行が不要
+
+**簡素化されたワークフロー**:
+```python
+def mixer_realtime_changes():
+    """Mixerでのリアルタイムレベル変更（固定出力版）"""
+    # ... 初期セットアップ ...
+    
+    # 初期状態で音声出力
+    vca.out_to_channel(0)
+    time.sleep(2)
+    
+    # リード追加
+    print("リード追加")
+    mixer.set_input_level(1, 0.4)
+    mixer.process()
+    vcf.process()
+    vca.process()
+    # ✅ 音声出力は自動的に維持される
+    time.sleep(2)
+    
+    # 別の変更
+    print("ノイズ追加")
+    mixer.set_input_level(2, 0.2)
+    mixer.process()
+    vcf.process()
+    vca.process()
+    # ✅ 音声出力は自動的に維持される
+    time.sleep(2)
+```
+
+**現実のモジュラーシンセとの一致**:
+- **実際のハードウェア**: ケーブル接続は物理的に維持される ✅
+- **このソフトウェア**: 固定出力オブジェクトにより同様の動作を実現 ✅
+- **利点**: より直感的で自然なワークフロー
 
 ### CVMath（CV演算）モジュール
 

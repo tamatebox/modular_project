@@ -6,6 +6,7 @@ from typing import Dict, List, Any
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 from src.connection import ConnectionManager
+from pyo import Sig
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,9 @@ class BaseModule:
 
         # 処理に使用するpyoオブジェクト
         self.pyo_objects: List[Any] = []
+
+        # 固定出力オブジェクト管理
+        self.fixed_outputs: Dict[str, Any] = {}
 
         # 最後に更新された時刻
         self.last_update = time.time()
@@ -189,6 +193,42 @@ class BaseModule:
         if self.is_active:
             self.process()
             self.last_update = time.time()
+
+    def create_fixed_output(self, port_name: str, initial_value=0):
+        """
+        固定出力オブジェクトを作成
+        
+        Args:
+            port_name: 出力ポート名
+            initial_value: 初期値
+            
+        Returns:
+            作成された固定出力オブジェクト
+        """
+        if port_name not in self.fixed_outputs:
+            fixed_output = Sig(initial_value)
+            self.fixed_outputs[port_name] = fixed_output
+            self.outputs[port_name] = fixed_output
+            self.pyo_objects.append(fixed_output)
+            logger.info(f"{self.name} created fixed output: {port_name}")
+        return self.fixed_outputs[port_name]
+
+    def update_fixed_output(self, port_name: str, new_value, multiplier=None):
+        """
+        固定出力オブジェクトの内容を更新
+        
+        Args:
+            port_name: 出力ポート名
+            new_value: 新しい値
+            multiplier: 乗算器（オプション）
+        """
+        if port_name in self.fixed_outputs:
+            self.fixed_outputs[port_name].setValue(new_value)
+            if multiplier is not None:
+                self.fixed_outputs[port_name].setMul(multiplier)
+            logger.info(f"{self.name} updated fixed output: {port_name}")
+        else:
+            logger.warning(f"{self.name} fixed output not found: {port_name}")
 
     def get_info(self) -> Dict[str, Any]:
         """
