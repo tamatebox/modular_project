@@ -456,6 +456,156 @@ def mixer_chord():
 
 ### CVMath（CV演算）モジュール
 
+CVMathモジュールは複数のCV信号を数学的に演算して新しいCV信号を生成します。
+
+#### 基本的な使用方法
+
+```python
+def cvmath_basic_operations():
+    """CVMath基本演算: 2つのLFOを組み合わせてVCO制御"""
+    s = Server(nchnls=2, buffersize=512, duplex=0).boot().start()
+
+    try:
+        cm = ConnectionManager()
+
+        # モジュール作成
+        lfo1 = LFO(name="slow_lfo", initial_freq=0.5)  # ゆっくりなLFO
+        lfo2 = LFO(name="fast_lfo", initial_freq=4.0)  # 速いLFO
+        cv_math = CVMath(name="math", operation="add")
+        vco = VCO(name="osc", base_freq=440)
+        vca = VCA(name="amp", initial_gain=0.4)
+
+        # 登録・起動
+        for module in [lfo1, lfo2, cv_math, vco, vca]:
+            cm.register_module(module.name, module)
+            module.start()
+
+        # LFO設定
+        lfo1.set_amplitude(200)  # ±200Hz変調
+        lfo2.set_amplitude(100)  # ±100Hz変調
+
+        # CV演算設定
+        cv_math.set_scale(0.8)   # 結果を0.8倍
+        cv_math.set_offset(0.1)  # 小さなオフセット
+
+        # 接続: 2つのLFO → CVMath → VCO → VCA
+        cm.connect("slow_lfo", "cv_out", "math", "input_a", SignalType.CV)
+        cm.connect("fast_lfo", "cv_out", "math", "input_b", SignalType.CV)
+        cm.connect("math", "output", "osc", "freq_cv", SignalType.CV)
+        cm.connect("osc", "audio_out", "amp", "audio_in", SignalType.AUDIO)
+
+        # 処理（信号の流れ順）
+        cv_math.process()
+        vco.process()
+        vca.process()
+
+        # 音声出力
+        vca.out_to_channel(0)
+
+        print("加算演算: LFO1(0.5Hz) + LFO2(4Hz)")
+        time.sleep(3)
+
+        # 演算を変更してリアルタイムで音の変化を確認
+        print("減算演算: LFO1 - LFO2")
+        cv_math.set_operation("subtract")
+        cv_math.process()  # 🚨 重要：演算変更を反映
+        time.sleep(3)
+
+        print("乗算演算: LFO1 * LFO2（リングモジュレーション効果）")
+        cv_math.set_operation("multiply")
+        cv_math.set_scale(0.1)  # 乗算結果は大きくなるのでスケール調整
+        cv_math.process()  # 🚨 重要：パラメータ変更を反映
+        time.sleep(3)
+
+    finally:
+        s.stop()
+        s.shutdown()
+```
+
+#### CV制御のデバッグと数値監視
+
+CVMathモジュールの動作確認には数値監視が非常に有効です：
+
+```python
+def cvmath_with_monitoring():
+    """CV値の数値監視付きCVMathテスト"""
+    s = Server(nchnls=2, buffersize=512, duplex=0).boot().start()
+
+    try:
+        cm = ConnectionManager()
+
+        # モジュール作成・登録・起動
+        lfo1 = LFO(name="lfo1", initial_freq=0.2)
+        lfo2 = LFO(name="lfo2", initial_freq=3.0)
+        cv_math = CVMath(name="math", operation="add")
+        vco = VCO(name="osc", base_freq=440)
+        vca = VCA(name="amp", initial_gain=0.4)
+
+        for module in [lfo1, lfo2, cv_math, vco, vca]:
+            cm.register_module(module.name, module)
+            module.start()
+
+        lfo1.set_amplitude(200)
+        lfo2.set_amplitude(100)
+
+        # 接続
+        cm.connect("lfo1", "cv_out", "math", "input_a", SignalType.CV)
+        cm.connect("lfo2", "cv_out", "math", "input_b", SignalType.CV)
+        cm.connect("math", "output", "osc", "freq_cv", SignalType.CV)
+        cm.connect("osc", "audio_out", "amp", "audio_in", SignalType.AUDIO)
+
+        cv_math.process()
+        vco.process()
+        vca.process()
+
+        # CV値監視機能を追加
+        def get_pyo_value(pyo_obj):
+            """PyoObjectから安全に値を取得"""
+            if not pyo_obj or not hasattr(pyo_obj, 'get'):
+                return "N/A"
+            try:
+                val = pyo_obj.get()
+                return val[0] if isinstance(val, (list, tuple)) and len(val) > 0 else val
+            except (IndexError, TypeError):
+                return "N/A"
+
+        def print_cv_values():
+            """CV値をリアルタイム監視"""
+            lfo1_cv = lfo1.outputs.get("cv_out")
+            lfo2_cv = lfo2.outputs.get("cv_out")
+            result_cv = cv_math.outputs.get("output")
+            
+            lfo1_val = get_pyo_value(lfo1_cv)
+            lfo2_val = get_pyo_value(lfo2_cv)
+            result_val = get_pyo_value(result_cv)
+            
+            def format_val(val):
+                return f"{val:.3f}" if isinstance(val, (int, float)) else str(val)
+            
+            print(f"  監視 - LFO1: {format_val(lfo1_val)}, LFO2: {format_val(lfo2_val)}, 演算結果: {format_val(result_val)}")
+
+        # 音声出力
+        vca.out_to_channel(0)
+
+        print("加算演算の6秒間監視:")
+        for i in range(12):  # 0.5秒間隔で6秒間
+            print_cv_values()
+            time.sleep(0.5)
+
+        print("\n減算演算に変更:")
+        cv_math.set_operation("subtract")
+        cv_math.process()
+        for i in range(4):  # 2秒間監視
+            print_cv_values()
+            time.sleep(0.5)
+
+    finally:
+        s.stop()
+        s.shutdown()
+```
+
+#### 複雑なCV制御の例
+
 ```python
 def cvmath_complex_modulation():
     """複雑なCV制御: LFO + エンベロープでVCO制御"""
@@ -509,6 +659,31 @@ def cvmath_complex_modulation():
     finally:
         s.stop()
         s.shutdown()
+```
+
+#### CVMathデバッグのベストプラクティス
+
+1. **数値監視の重要性**: 音響的変化が微細な場合、数値による客観的確認が必須
+2. **安全な値取得**: PyoObjectからの値取得にはエラーハンドリングを含める
+3. **リアルタイム監視**: 0.5秒間隔での連続監視により時間的変化を追跡
+4. **演算結果の検証**: 手動計算との比較による演算正当性の確認
+
+```python
+# CVMathテストでの標準的なデバッグパターン
+def get_pyo_value(pyo_obj):
+    """安全なPyoObject値取得（標準関数）"""
+    if not pyo_obj or not hasattr(pyo_obj, 'get'):
+        return "N/A"
+    try:
+        val = pyo_obj.get()
+        return val[0] if isinstance(val, (list, tuple)) and len(val) > 0 else val
+    except (IndexError, TypeError):
+        return "N/A"
+
+# リアルタイム監視ループ
+for i in range(monitoring_duration * 2):  # 0.5秒間隔
+    print_cv_values()
+    time.sleep(0.5)
 ```
 
 ## 🎯 まとめ
