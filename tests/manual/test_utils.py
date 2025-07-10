@@ -115,9 +115,13 @@ class TestRunner:
 
     def process_chain(self, *module_names):
         """指定されたモジュールをチェーン順にprocess"""
+        print(f"  PROCESS_CHAIN: Processing modules: {module_names}")
         for name in module_names:
             if name in self.modules:
+                print(f"  PROCESS_CHAIN: Processing {name}")
                 self.modules[name].process()
+            else:
+                print(f"  PROCESS_CHAIN: WARNING - Module {name} not found!")
 
     def output_audio(self, module_name, channel=0):
         """指定されたモジュールから音声を出力"""
