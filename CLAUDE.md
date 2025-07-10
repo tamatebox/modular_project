@@ -82,6 +82,10 @@ s.shutdown()
 ### Test Files
 - `tests/manual/test_vco_vca_connection.py`: Tests basic VCO->VCA connections with detailed debugging
 - `tests/manual/test_vcf_lfo_env.py`: Tests VCF, LFO, and ENV modules with audio output
+- `tests/manual/test_multiple.py`: Tests Multiple (branching) module functionality
+- `tests/manual/test_mixer.py`: Tests Mixer module for audio mixing
+- `tests/manual/test_cvmath.py`: Tests CVMath module for CV signal processing
+- `tests/manual/test_advanced_modules.py`: Tests advanced module integration scenarios
 
 ### Logging Configuration
 Always configure logging in main entry points:
@@ -182,6 +186,24 @@ python tests/manual/test_vco_vca_connection.py
 # Test advanced modules (VCF, LFO, ENV)
 python tests/manual/test_vcf_lfo_env.py
 
+# Test high-level modules
+python tests/manual/test_multiple.py
+python tests/manual/test_mixer.py
+python tests/manual/test_cvmath.py
+python tests/manual/test_advanced_modules.py
+
 # Code formatting
 black --line-length 119 src/
 ```
+
+## Important: Test Execution Notes
+
+Manual test files **actually play audio**, so please note the following:
+
+1. **Tests must be run by the user** (AI assistants cannot hear audio)
+2. **Check appropriate volume settings** before running tests
+3. **Ensure headphones or speakers** are properly connected
+4. **For macOS**: Check microphone/audio access permissions in System Preferences
+5. **Test success** should be determined by whether audio is actually playing
+
+These tests are designed for manual execution, play actual audio, and include user input prompts between test sections.
