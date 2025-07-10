@@ -18,6 +18,9 @@ from src.modules.vca import VCA
 from src.modules.vcf import VCF
 from src.modules.lfo import LFO
 from src.modules.env import ENV
+from src.modules.multiple import Multiple
+from src.modules.mixer import Mixer
+from src.modules.cvmath import CVMath
 
 # ログ設定
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -59,9 +62,9 @@ class TestModuleFactory:
         return VCF(name=name, initial_freq=freq, initial_q=q)
 
     @staticmethod
-    def create_lfo(name="test_lfo", freq=1, waveform="sine", amplitude=100):
-        """標準的なLFOを作成"""
-        lfo = LFO(name=name, initial_freq=freq, waveform=waveform)
+    def create_lfo(name="test_lfo", freq=1.0, waveform="sine", amplitude=100):
+        """標準的なLFOを作成（float周波数対応）"""
+        lfo = LFO(name=name, initial_freq=float(freq), waveform=waveform)
         lfo.set_amplitude(amplitude)
         return lfo
 
@@ -74,6 +77,21 @@ class TestModuleFactory:
         env.set_sustain(sustain)
         env.set_release(release)
         return env
+
+    @staticmethod
+    def create_multiple(name="test_multiple", outputs=4):
+        """標準的なMultipleを作成"""
+        return Multiple(name=name, outputs=outputs)
+
+    @staticmethod
+    def create_mixer(name="test_mixer", inputs=4):
+        """標準的なMixerを作成"""
+        return Mixer(name=name, inputs=inputs)
+
+    @staticmethod
+    def create_cvmath(name="test_cvmath", operation="add"):
+        """標準的なCVMathを作成"""
+        return CVMath(name=name, operation=operation)
 
 
 class TestRunner:

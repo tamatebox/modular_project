@@ -38,10 +38,6 @@ def test_mixer_basic_chord():
         print(f"  VCA 出力: {vca.outputs.get('audio_out')}")
 
         runner.process_chain("mixer", "vca")
-
-        # 重要：接続を再適用してMixerの新しい出力をVCAに渡す
-        runner.cm.update_all_connections()
-        vca.process()
         runner.output_audio("vca", 0)
 
         print("  process()後の状態:")
@@ -89,9 +85,6 @@ def test_mixer_chord_progression():
         mixer.set_master_level(0.6)
 
         runner.process_chain("mixer", "vcf", "vca")
-        # 重要：接続を再適用してMixerの新しい出力をVCFに渡す
-        runner.cm.update_all_connections()
-        runner.process_chain("vcf", "vca")
         runner.output_audio("vca", 0)
 
         print("  A major (A-C#-E) 和音")
@@ -143,9 +136,6 @@ def test_mixer_rhythmic_pattern():
         mixer.set_master_level(0.7)
 
         runner.process_chain("mixer", "vcf", "vca")
-        # 重要：接続を再適用してMixerの新しい出力をVCFに渡す
-        runner.cm.update_all_connections()
-        runner.process_chain("vcf", "vca")
         runner.output_audio("vca", 0)
 
         print("  ベースのみ")
@@ -153,32 +143,19 @@ def test_mixer_rhythmic_pattern():
 
         print("  リード追加")
         mixer.set_input_level(1, 0.4)
-        mixer.process()
-        runner.cm.update_all_connections()
-        vcf.process()
-        vca.process()
-        # VCAの出力が新しいオブジェクトに変わるため、再度チャンネル出力を設定
-        runner.output_audio("vca", 0)
+        runner.process_chain("mixer", "vcf", "vca")
         runner.play_for(2)
 
         print("  ノイズ追加（パーカッション風）")
         mixer.set_input_level(2, 0.2)
-        mixer.process()
-        runner.cm.update_all_connections()
-        vcf.process()
-        vca.process()
-        runner.output_audio("vca", 0)
+        runner.process_chain("mixer", "vcf", "vca")
         runner.play_for(2)
 
         print("  ベースを減らしてリードを強調")
         mixer.set_input_level(0, 0.3)
         mixer.set_input_level(1, 0.6)
         mixer.set_input_level(2, 0.1)
-        mixer.process()
-        runner.cm.update_all_connections()
-        vcf.process()
-        vca.process()
-        runner.output_audio("vca", 0)
+        runner.process_chain("mixer", "vcf", "vca")
         runner.play_for(2)
 
         runner.cleanup()
@@ -222,11 +199,7 @@ def test_mixer_stereo_spread():
 
         runner.process_chain("mixer_left", "mixer_right", "vca_left", "vca_right")
 
-        # 重要：接続を再適用してMixerの新しい出力をVCAに渡す
-        runner.cm.update_all_connections()
-        runner.process_chain("vca_left", "vca_right")
-
-        # ステレオ出力を後に設定
+        # ステレオ出力を設定
         runner.output_audio("vca_left", 0)  # 左チャンネル
         runner.output_audio("vca_right", 1)  # 右チャンネル
 
@@ -245,7 +218,7 @@ def test_mixer_stereo_spread():
         mixer_right.set_input_level(1, 0.3)
         mixer_right.set_input_level(2, 0.1)
 
-        runner.process_chain("mixer_left", "mixer_right")
+        runner.process_chain("mixer_left", "mixer_right", "vca_left", "vca_right")
         runner.play_for(4)
 
         runner.cleanup()
